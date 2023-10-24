@@ -1,12 +1,12 @@
+from typing import Optional, List
+
 import uvicorn
 from fastapi import FastAPI
 
-from models.models import Feedback
-from models.models import User
+from models.models import UserCreate, Feedback, Product
+from db import products
 
 app = FastAPI()
-
-user = User(id=1, name='John Doe', age=18)
 
 fake_users = [
     {'id': 1, 'role': 'admin', 'name': 'Roman'},
@@ -34,17 +34,33 @@ def is_user_exists(user_id: int):
     return {'error': 'User not found'}
 
 
-@app.post('/user')
-def check_user_age(user_info: User):
-    ans = user_info.model_dump()
-    ans.update({'is_adult': user_info.age >= 18})
-    return ans
-
-
 @app.post('/feedback', response_model=Feedback)
 def send_feedback(feedback: Feedback):
     feedbacks.append(feedback.model_dump())
     return feedback
+
+
+@app.post('/create_user', response_model=UserCreate)
+def create_user(user: UserCreate):
+    return user
+
+
+@app.get('/product/{product_id}', response_model=Product)
+def get_product(product_id: int):
+    for prod in products:
+        if prod['product_id'] == product_id:
+            return Product(**prod)
+
+
+@app.get('/products/search', response_model=List[Product])
+def search_product(keyword: str, category: Optional[str] = None, limit: Optional[int] = 10):
+    ans = []
+    for prod in products:
+        if keyword in prod['name']:
+            if (category and prod['category'] == category) or not category:
+                ans.append(Product(**prod))
+    return ans[:limit]
+
 
 # if __name__ == '__main__':
 #     uvicorn.run('main:app', host='localhost', port=8000, reload=True, workers=3)
