@@ -1,9 +1,10 @@
 import datetime
+import re
 import uuid
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Dict
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Header, Response, Request, HTTPException
 from fastapi_users import FastAPIUsers
 from pydantic import BaseModel, Field
 
@@ -40,33 +41,10 @@ current_user = fastapi_users.current_user()
 def protected_route(user: User = Depends(current_user)):
     return f'Hello, {user.username}.'
 
+
 @app.get('/unprotected-route')
 def protected_route():
     return f'Hello, Noname.'
-
-fake_users = [
-    {'id': 1, 'role': 'admin', 'name': 'Roman'},
-    {'id': 2, 'role': 'beginner', 'name': 'Radmir'},
-    {'id': 3, 'role': 'traider', 'name': 'Sgor'},
-]
-fake_users_2 = [
-    {
-        'id': 1, 'role': 'admin', 'name': 'Roman', 'degree': [{
-        'id': 1, 'created_at': datetime.datetime.now(), 'type_degree': 'expert'
-    }]
-    },
-    {
-        'id': 2, 'role': 'beginner', 'name': 'Radmir',
-    },
-    {
-        'id': 3, 'role': 'trader', 'name': 'Sgor'
-    },
-]
-
-fake_trades = [
-    {'id': 1, 'user_id': 1, 'currency': 'BTC', 'side': 'buy', 'price': 25000, 'amount': 0.0023},
-    {'id': 1, 'user_id': 1, 'currency': 'BTC', 'side': 'sell', 'price': 29500, 'amount': 0.0015}
-]
 
 
 class DegreeType(Enum):
@@ -87,21 +65,27 @@ class User(BaseModel):
     degree: Optional[List[Degree]] = []
 
 
-@app.get('/users/{user_id}', response_model=List[User])
-def get_user(user_id: int):
-    return [user for user in fake_users_2 if user.get('id') == user_id]
+def check_headers(header):
+    if 'User-Agent' not in header:
+        raise HTTPException(status_code=400, detail='User-Agent header not found')
+    if 'Accept-Language' not in header:
+        raise HTTPException(status_code=400, detail='Accept-Language header not found')
+    if header['Accept-Language'] not in ['en-US', 'ru-RU', 'ua-UA']:
+        raise HTTPException(status_code=400, detail='Accept-Language is not in the correct format')
 
 
-@app.get('/trades')
-def get_trades(limit: int = 1, offset: int = 0):
-    return fake_trades[offset:][:limit]
+@app.get('/headers')
+def headers(request: Request):
+    header = request.headers
+    check_headers(header)
+    return {'User-Agent': header['User-Agent'],
+            'Accept-Language': header['Accept-Language']}
 
 
-@app.post('/users/{user_id}')
-def change_user_name(user_id: int, new_name: str):
-    curr_user = list(filter(lambda user: user.get('id') == user_id, fake_users_2))[0]
-    curr_user['name'] = new_name
-    return {'status': 200, 'data': curr_user}
+@app.get('/')
+def root():
+    return Response(content='Hey, everyone!', media_type='text/plain',
+                    headers={"Secret-Code": '24022022'})
 
 
 class Trade(BaseModel):
@@ -111,9 +95,3 @@ class Trade(BaseModel):
     side: str
     price: float = Field(ge=0)
     amount: float
-
-
-@app.post('/trades')
-def add_trade(trade: Trade):
-    fake_trades.append(trade)
-    return {'status': 200, 'data': fake_trades}
