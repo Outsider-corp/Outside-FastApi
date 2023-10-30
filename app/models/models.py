@@ -23,6 +23,7 @@ class Product(BaseModel):
     price: float
 
 
-class User(BaseModel):
+class Man(BaseModel):
     username: str
     password: str
+

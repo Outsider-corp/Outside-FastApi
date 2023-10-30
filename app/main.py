@@ -1,10 +1,14 @@
 from typing import Optional, List
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.params import Form, Depends
+from sqlalchemy.orm import Session
 
-from models.models import UserCreate, Feedback, Product
-from db import products
+from app.database.database import session
+from auth.database import get_user_db
+from app.models.models import UserCreate, Feedback, Product, Man
+from db_test_list import products
 
 app = FastAPI()
 
@@ -14,6 +18,13 @@ fake_users = [
     {'id': 3, 'role': 'traider', 'name': 'Sgor'},
 ]
 feedbacks = []
+
+def get_db():
+    db = session()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 @app.get('/')
@@ -61,6 +72,13 @@ def search_product(keyword: str, category: Optional[str] = None, limit: Optional
                 ans.append(Product(**prod))
     return ans[:limit]
 
+
+@app.get('/login')
+async def login(db: Session = Depends(get_db), username: str = Form(), password: str = Form()):
+    if db.query(Man).filter((Man.username == username) & (Man.password == password)):
+        return {'You got my secret, welcome'}
+    else:
+        return HTTPException(status_code=401, detail='Credentials ')
 
 # if __name__ == '__main__':
 #     uvicorn.run('main:app', host='localhost', port=8000, reload=True, workers=3)
